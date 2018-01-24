@@ -84,9 +84,9 @@ def main():
       start, end, label = segs[i].split(',')
       next_start, next_end, next_label = segs[i+1].split(',')
       if float(end) > float(next_start):
-        done = False
         avg = str((float(next_start) + float(end)) / 2.0)
-        segs[i+1] = ','.join([avg, next_end, next_label])
+        new_end = str(max(float(end), float(next_end)))
+        segs[i+1] = ','.join([avg, new_end, next_label])
         new_segs += " " + start + "," + avg + "," + label
       else:
         new_segs += " " + start + "," + end + "," + label
