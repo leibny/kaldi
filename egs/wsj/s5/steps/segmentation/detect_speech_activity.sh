@@ -93,7 +93,9 @@ dir=$4            # Work directory
 data_dir=$5       # The output data directory will be ${data_dir}_seg
 
 affix=${affix:+_$affix}
+echo $affix
 feat_affix=${feat_affix:+_$feat_affix}
+echo $feat_affix 
 
 data_id=`basename $data_dir`
 sad_dir=${dir}/${sad_name}${affix}_${data_id}_whole${feat_affix}
@@ -112,15 +114,17 @@ else
     utils/copy_data_dir.sh $src_data_dir $test_data_dir
   fi
 fi
-
 ###############################################################################
 ## Extract input features 
 ###############################################################################
-
 if [ $stage -le 1 ]; then
-  utils/fix_data_dir.sh $test_data_dir
-  steps/make_mfcc.sh --mfcc-config $mfcc_config --nj $nj --cmd "$cmd" --write-utt2num-frames true \
-    ${test_data_dir} exp/make_hires$feat_affix/${data_id} $mfcc_dir
+  #utils/fix_data_dir.sh $test_data_dir
+  #echo Paola
+  #echo steps/make_mfcc.sh --mfcc-config $mfcc_config --nj $nj --cmd "$cmd" --write-utt2num-frames true \
+  #  ${test_data_dir} exp/make_hires$feat_affix/${data_id} $mfcc_dir
+  #echo Paola
+  #steps/make_mfcc.sh --mfcc-config $mfcc_config --nj $nj --cmd "$cmd" --write-utt2num-frames true \
+  #  ${test_data_dir} exp/make_hires$feat_affix/${data_id} $mfcc_dir
   steps/compute_cmvn_stats.sh ${test_data_dir} exp/make_hires$feat_affix/${data_id} $mfcc_dir
   utils/fix_data_dir.sh ${test_data_dir}
 fi
