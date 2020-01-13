@@ -1,9 +1,9 @@
 #!/bin/bash
 # Copyright   2017   Johns Hopkins University (Author: Daniel Garcia-Romero)
 #             2017   Johns Hopkins University (Author: Daniel Povey)
-#        2017-2018   David Snyder
-#             2018   Ewald Enzinger
-#             2018   Zili Huang
+#        2017-2   David Snyder
+#             2   Ewald Enzinger
+#             2   Zili Huang
 # Apache 2.0.
 #
 # See ../README.txt for more info on data required.
@@ -19,8 +19,8 @@ voxceleb1_root=/export/corpora/VoxCeleb1
 voxceleb2_root=/export/corpora/VoxCeleb2
 nnet_dir=exp/xvector_nnet_1a
 musan_root=/export/corpora/JHU/musan
-dihard_2018_dev=/export/corpora/LDC/LDC2018E31
-dihard_2018_eval=/export/corpora/LDC/LDC2018E32v1.1
+dihard_2_dev=/export/corpora/LDC/LDC2E31
+dihard_2_eval=/export/corpora/LDC/LDC2E32v1.1
 
 stage=0
 
@@ -39,14 +39,14 @@ if [ $stage -le 0 ]; then
   # This should give 7,351 speakers and 1,277,503 utterances.
   utils/combine_data.sh data/train data/voxceleb2_train data/voxceleb2_test data/voxceleb1_train
 
-  # Prepare the development and evaluation set for DIHARD 2018.
-  local/make_dihard_2018_dev.sh $dihard_2018_dev data/dihard_2018_dev
-  local/make_dihard_2018_eval.sh $dihard_2018_eval data/dihard_2018_eval
+  # Prepare the development and evaluation set for DIHARD 2.
+  local/make_dihard_2_dev.sh $dihard_2_dev data/dihard_2_dev
+  local/make_dihard_2_eval.sh $dihard_2_eval data/dihard_2_eval
 fi
 
 if [ $stage -le 1 ]; then
   # Make MFCCs for each dataset.
-  for name in train dihard_2018_dev dihard_2018_eval; do
+  for name in train dihard_2_dev dihard_2_eval; do
     steps/make_mfcc.sh --write-utt2num-frames true --mfcc-config conf/mfcc.conf --nj 40 --cmd "$train_cmd --max-jobs-run 20" \
       data/${name} exp/make_mfcc $mfccdir
     utils/fix_data_dir.sh data/${name}
@@ -63,7 +63,7 @@ if [ $stage -le 1 ]; then
   # were performed in memory (e.g., we used --apply-cmn true in
   # diarization/nnet3/xvector/extract_xvectors.sh) it would need to be
   # performed after the subsegmentation, which leads to poorer results.
-  for name in train dihard_2018_dev dihard_2018_eval; do
+  for name in train dihard_2_dev dihard_2_eval; do
     local/nnet3/xvector/prepare_feats.sh --nj 40 --cmd "$train_cmd" \
       data/$name data/${name}_cmn exp/${name}_cmn
     if [ -f data/$name/vad.scp ]; then
@@ -75,8 +75,8 @@ if [ $stage -le 1 ]; then
     utils/fix_data_dir.sh data/${name}_cmn
   done
 
-  echo "0.01" > data/dihard_2018_dev_cmn/frame_shift
-  echo "0.01" > data/dihard_2018_eval_cmn/frame_shift
+  echo "0.01" > data/dihard_2_dev_cmn/frame_shift
+  echo "0.01" > data/dihard_2_eval_cmn/frame_shift
   echo "0.01" > data/train_cmn/frame_shift
   # Create segments to extract x-vectors from for PLDA training data.
   # The segments are created using an energy-based speech activity
@@ -197,16 +197,16 @@ local/nnet3/xvector/run_xvector.sh --stage $stage --train-stage -1 \
   --egs-dir $nnet_dir/egs
 
 if [ $stage -le 9 ]; then
-  # Extract x-vectors for DIHARD 2018 development and evaluation set.
+  # Extract x-vectors for DIHARD 2 development and evaluation set.
   diarization/nnet3/xvector/extract_xvectors.sh --cmd "$train_cmd --mem 5G" \
     --nj 40 --window 1.5 --period 0.75 --apply-cmn false \
     --min-segment 0.5 $nnet_dir \
-    data/dihard_2018_dev_cmn $nnet_dir/xvectors_dihard_2018_dev
+    data/dihard_2_dev_cmn $nnet_dir/xvectors_dihard_2_dev
 
   diarization/nnet3/xvector/extract_xvectors.sh --cmd "$train_cmd --mem 5G" \
     --nj 40 --window 1.5 --period 0.75 --apply-cmn false \
     --min-segment 0.5 $nnet_dir \
-    data/dihard_2018_eval_cmn $nnet_dir/xvectors_dihard_2018_eval
+    data/dihard_2_eval_cmn $nnet_dir/xvectors_dihard_2_eval
 
   # Reduce the amount of training data for the PLDA training.
   utils/subset_data_dir.sh data/train_cmn_segmented 128000 data/train_cmn_segmented_128k
@@ -221,76 +221,76 @@ fi
 
 # Train PLDA models
 if [ $stage -le 10 ]; then
-  # Train a PLDA model on VoxCeleb, using DIHARD 2018 development set to whiten.
-  "$train_cmd" $nnet_dir/xvectors_dihard_2018_dev/log/plda.log \
+  # Train a PLDA model on VoxCeleb, using DIHARD 2 development set to whiten.
+  "$train_cmd" $nnet_dir/xvectors_dihard_2_dev/log/plda.log \
     ivector-compute-plda ark:$nnet_dir/xvectors_train_segmented_128k/spk2utt \
       "ark:ivector-subtract-global-mean \
       scp:$nnet_dir/xvectors_train_segmented_128k/xvector.scp ark:- \
-      | transform-vec $nnet_dir/xvectors_dihard_2018_dev/transform.mat ark:- ark:- \
+      | transform-vec $nnet_dir/xvectors_dihard_2_dev/transform.mat ark:- ark:- \
       | ivector-normalize-length ark:- ark:- |" \
-    $nnet_dir/xvectors_dihard_2018_dev/plda || exit 1;
+    $nnet_dir/xvectors_dihard_2_dev/plda || exit 1;
 fi
 
 # Perform PLDA scoring
 if [ $stage -le 11 ]; then
   # Perform PLDA scoring on all pairs of segments for each recording.
   diarization/nnet3/xvector/score_plda.sh --cmd "$train_cmd --mem 4G" \
-    --nj 20 $nnet_dir/xvectors_dihard_2018_dev $nnet_dir/xvectors_dihard_2018_dev \
-    $nnet_dir/xvectors_dihard_2018_dev/plda_scores
+    --nj 20 $nnet_dir/xvectors_dihard_2_dev $nnet_dir/xvectors_dihard_2_dev \
+    $nnet_dir/xvectors_dihard_2_dev/plda_scores
 
   diarization/nnet3/xvector/score_plda.sh --cmd "$train_cmd --mem 4G" \
-    --nj 20 $nnet_dir/xvectors_dihard_2018_dev $nnet_dir/xvectors_dihard_2018_eval \
-    $nnet_dir/xvectors_dihard_2018_eval/plda_scores
+    --nj 20 $nnet_dir/xvectors_dihard_2_dev $nnet_dir/xvectors_dihard_2_eval \
+    $nnet_dir/xvectors_dihard_2_eval/plda_scores
 fi
 
 # Cluster the PLDA scores using a stopping threshold.
 if [ $stage -le 12 ]; then
-  # First, we find the threshold that minimizes the DER on DIHARD 2018 development set.
+  # First, we find the threshold that minimizes the DER on DIHARD 2 development set.
   mkdir -p $nnet_dir/tuning
-  echo "Tuning clustering threshold for DIHARD 2018 development set"
+  echo "Tuning clustering threshold for DIHARD 2 development set"
   best_der=100
   best_threshold=0
 
   # The threshold is in terms of the log likelihood ratio provided by the
   # PLDA scores.  In a perfectly calibrated system, the threshold is 0.
-  # In the following loop, we evaluate DER performance on DIHARD 2018 development
+  # In the following loop, we evaluate DER performance on DIHARD 2 development
   # set using some reasonable thresholds for a well-calibrated system.
   for threshold in -0.5 -0.4 -0.3 -0.2 -0.1 -0.05 0 0.05 0.1 0.2 0.3 0.4 0.5; do
     diarization/cluster.sh --cmd "$train_cmd --mem 4G" --nj 20 \
-      --threshold $threshold --rttm-channel 1 $nnet_dir/xvectors_dihard_2018_dev/plda_scores \
-      $nnet_dir/xvectors_dihard_2018_dev/plda_scores_t$threshold
+      --threshold $threshold --rttm-channel 1 $nnet_dir/xvectors_dihard_2_dev/plda_scores \
+      $nnet_dir/xvectors_dihard_2_dev/plda_scores_t$threshold
 
-    md-eval.pl -r data/dihard_2018_dev/rttm \
-     -s $nnet_dir/xvectors_dihard_2018_dev/plda_scores_t$threshold/rttm \
-     2> $nnet_dir/tuning/dihard_2018_dev_t${threshold}.log \
-     > $nnet_dir/tuning/dihard_2018_dev_t${threshold}
+    md-eval.pl -r data/dihard_2_dev/rttm \
+     -s $nnet_dir/xvectors_dihard_2_dev/plda_scores_t$threshold/rttm \
+     2> $nnet_dir/tuning/dihard_2_dev_t${threshold}.log \
+     > $nnet_dir/tuning/dihard_2_dev_t${threshold}
 
     der=$(grep -oP 'DIARIZATION\ ERROR\ =\ \K[0-9]+([.][0-9]+)?' \
-      $nnet_dir/tuning/dihard_2018_dev_t${threshold})
+      $nnet_dir/tuning/dihard_2_dev_t${threshold})
     if [ $(perl -e "print ($der < $best_der ? 1 : 0);") -eq 1 ]; then
       best_der=$der
       best_threshold=$threshold
     fi
   done
-  echo "$best_threshold" > $nnet_dir/tuning/dihard_2018_dev_best
+  echo "$best_threshold" > $nnet_dir/tuning/dihard_2_dev_best
 
   diarization/cluster.sh --cmd "$train_cmd --mem 4G" --nj 20 \
-    --threshold $(cat $nnet_dir/tuning/dihard_2018_dev_best) --rttm-channel 1 \
-    $nnet_dir/xvectors_dihard_2018_dev/plda_scores $nnet_dir/xvectors_dihard_2018_dev/plda_scores
+    --threshold $(cat $nnet_dir/tuning/dihard_2_dev_best) --rttm-channel 1 \
+    $nnet_dir/xvectors_dihard_2_dev/plda_scores $nnet_dir/xvectors_dihard_2_dev/plda_scores
 
-  # Cluster DIHARD 2018 evaluation set using the best threshold found for the DIHARD
-  # 2018 development set. The DIHARD 2018 development set is used as the validation
+  # Cluster DIHARD 2 evaluation set using the best threshold found for the DIHARD
+  # 2 development set. The DIHARD 2 development set is used as the validation
   # set to tune the parameters.
   diarization/cluster.sh --cmd "$train_cmd --mem 4G" --nj 20 \
-    --threshold $(cat $nnet_dir/tuning/dihard_2018_dev_best) --rttm-channel 1 \
-    $nnet_dir/xvectors_dihard_2018_eval/plda_scores $nnet_dir/xvectors_dihard_2018_eval/plda_scores
+    --threshold $(cat $nnet_dir/tuning/dihard_2_dev_best) --rttm-channel 1 \
+    $nnet_dir/xvectors_dihard_2_eval/plda_scores $nnet_dir/xvectors_dihard_2_eval/plda_scores
 
   mkdir -p $nnet_dir/results
-  # Compute the DER on the DIHARD 2018 evaluation set. We use the official metrics of
+  # Compute the DER on the DIHARD 2 evaluation set. We use the official metrics of
   # the DIHARD challenge. The DER is calculated with no unscored collars and including
   # overlapping speech.
-  md-eval.pl -r data/dihard_2018_eval/rttm \
-    -s $nnet_dir/xvectors_dihard_2018_eval/plda_scores/rttm 2> $nnet_dir/results/threshold.log \
+  md-eval.pl -r data/dihard_2_eval/rttm \
+    -s $nnet_dir/xvectors_dihard_2_eval/plda_scores/rttm 2> $nnet_dir/results/threshold.log \
     > $nnet_dir/results/DER_threshold.txt
   der=$(grep -oP 'DIARIZATION\ ERROR\ =\ \K[0-9]+([.][0-9]+)?' \
     $nnet_dir/results/DER_threshold.txt)
@@ -303,11 +303,11 @@ if [ $stage -le 13 ]; then
   # In this section, we show how to do the clustering if the number of speakers
   # (and therefore, the number of clusters) per recording is known in advance.
   diarization/cluster.sh --cmd "$train_cmd --mem 4G" --nj 20 \
-    --reco2num-spk data/dihard_2018_eval/reco2num_spk --rttm-channel 1 \
-    $nnet_dir/xvectors_dihard_2018_eval/plda_scores $nnet_dir/xvectors_dihard_2018_eval/plda_scores_num_spk
+    --reco2num-spk data/dihard_2_eval/reco2num_spk --rttm-channel 1 \
+    $nnet_dir/xvectors_dihard_2_eval/plda_scores $nnet_dir/xvectors_dihard_2_eval/plda_scores_num_spk
 
-  md-eval.pl -r data/dihard_2018_eval/rttm \
-    -s $nnet_dir/xvectors_dihard_2018_eval/plda_scores_num_spk/rttm 2> $nnet_dir/results/num_spk.log \
+  md-eval.pl -r data/dihard_2_eval/rttm \
+    -s $nnet_dir/xvectors_dihard_2_eval/plda_scores_num_spk/rttm 2> $nnet_dir/results/num_spk.log \
     > $nnet_dir/results/DER_num_spk.txt
   der=$(grep -oP 'DIARIZATION\ ERROR\ =\ \K[0-9]+([.][0-9]+)?' \
     $nnet_dir/results/DER_num_spk.txt)
